@@ -298,7 +298,7 @@ class Inky:
             if time.time() - t_start >= timeout:
                 raise RuntimeError("Timeout waiting for busy signal to clear.")
 
-    def _update(self, buf, busy_wait=True):
+    def _fast_update(self, buf, busy_wait=True):
         """Update display.
 
         Dispatches display update to correct driver.
@@ -307,20 +307,38 @@ class Inky:
         :param buf_b: Yellow/Red pixels
 
         """
+
+        # Data transmit.
+        self._send_command(UC8159_DTM1, buf)
+        if busy_wait:
+            self._busy_wait()
+        
+        # Data stop.
+        self._send_command(UC8159_DSP)
+        if busy_wait:
+            self._busy_wait()
+        
+        # Display refresh.
+        self._send_command(UC8159_DRF)
+        if busy_wait:
+            self._busy_wait()
+        
+    def power_on(self, busy_wait=True):
+        """Initialize the display for _fast_update.
+        """
         self.setup()
 
-        self._send_command(UC8159_DTM1, buf)
-        self._busy_wait()
-
         self._send_command(UC8159_PON)
-        self._busy_wait()
+        if busy_wait:
+            self._busy_wait()
 
-        self._send_command(UC8159_DRF)
-        self._busy_wait()
-
+    def power_off(self, busy_wait=True):
+        """Initialize the display for _fast_update.
+        """
         self._send_command(UC8159_POF)
-        self._busy_wait()
-
+        if busy_wait:
+            self._busy_wait()
+        
     def set_pixel(self, x, y, v):
         """Set a single pixel.
 
@@ -353,6 +371,29 @@ class Inky:
         buf = ((buf[::2] << 4) & 0xF0) | (buf[1::2] & 0x0F)
 
         self._update(buf.astype('uint8').tolist(), busy_wait=busy_wait)
+
+    def fast_show(self, busy_wait=True):
+        """Show buffer on display. Assumes power_on has been called.
+
+        :param busy_wait: If True, wait for display update to finish before returning.
+
+        """
+        region = self.buf
+
+        if self.v_flip:
+            region = numpy.fliplr(region)
+
+        if self.h_flip:
+            region = numpy.flipud(region)
+
+        if self.rotation:
+            region = numpy.rot90(region, self.rotation // 90)
+
+        buf = region.flatten()
+
+        buf = ((buf[::2] << 4) & 0xF0) | (buf[1::2] & 0x0F)
+
+        self._fast_update(buf.astype('uint8').tolist(), busy_wait=busy_wait)
 
     def set_border(self, colour):
         """Set the border colour."""
