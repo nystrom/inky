@@ -141,7 +141,7 @@ class Inky:
         # Check for supported display variant and select the correct resolution
         # Eg: 600x480 and 640x400
         if self.eeprom is not None and self.eeprom.display_variant in (14, 15):
-            eeprom_resolution = _RESOLUTION.keys[self.eeprom.display_variant - 14]
+            eeprom_resolution = list(_RESOLUTION.keys())[self.eeprom.display_variant - 14]
             self.resolution = eeprom_resolution
             self.width, self.height = eeprom_resolution
             self.cols, self.rows, self.rotation, self.offset_x, self.offset_y, self.resolution_setting = _RESOLUTION[eeprom_resolution]
@@ -297,6 +297,19 @@ class Inky:
             time.sleep(0.01)
             if time.time() - t_start >= timeout:
                 raise RuntimeError("Timeout waiting for busy signal to clear.")
+
+    def _update(self, buf, busy_wait=True):
+        """Update display.
+
+        Dispatches display update to correct driver.
+
+        :param buf_a: Black/White pixels
+        :param buf_b: Yellow/Red pixels
+
+        """
+        self.power_on(busy_wait)
+        self._fast_update(buf, busy_wait)
+        self.power_off(busy_wait)
 
     def _fast_update(self, buf, busy_wait=True):
         """Update display.
